@@ -33,12 +33,16 @@ import hudson.util.FormValidation;
 import hudson.util.ListBoxModel;
 import hudson.util.Secret;
 import jenkins.model.Jenkins;
+import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
+
+import org.apache.commons.lang3.StringUtils;
 import org.jenkinsci.Symbol;
 import org.jenkinsci.plugins.JiraTestResultReporter.config.AbstractFields;
 import org.jenkinsci.plugins.JiraTestResultReporter.config.StringFields;
 import org.jenkinsci.plugins.JiraTestResultReporter.restclientextensions.FullStatus;
 import org.jenkinsci.plugins.JiraTestResultReporter.restclientextensions.JiraRestClientExtension;
+import org.kohsuke.stapler.Ancestor;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.Stapler;
@@ -103,7 +107,12 @@ public class JiraTestDataPublisher extends TestDataPublisher {
      * Getter for the project associated with this publisher
      * @return
      */
-    private AbstractProject getJobName() {
+    public AbstractProject getJobName() {
+        JiraUtils.log("ANCESTORS >>> ");
+        for (Ancestor ancestor : Stapler.getCurrentRequest().getAncestors()) {
+            JiraUtils.log(ancestor.toString());
+        }
+        JiraUtils.log("ANCESTORS END >>>");
         return Stapler.getCurrentRequest().findAncestorObject(AbstractProject.class);
     }
 
@@ -143,6 +152,14 @@ public class JiraTestDataPublisher extends TestDataPublisher {
                 .withAutoUnlinkIssues(autoUnlinkIssue)
                 .withConfigs(Util.fixNull(configs))
                 .build();
+
+        if (Stapler.getCurrentRequest() != null) {
+            JiraUtils.log("ANCESTORS");
+            for (Ancestor ancestor : Stapler.getCurrentRequest().getAncestors()) {
+                JiraUtils.log(ancestor.toString());
+            }
+            JiraUtils.log("ANCESTORS END");
+        }
 
         if (Stapler.getCurrentRequest() != null) {
             //classic job - e.g. Freestyle project, Matrix project, etc.
@@ -557,7 +574,7 @@ public class JiraTestDataPublisher extends TestDataPublisher {
             }
             return m;
         }
-
+        
         /**
          * Ugly hack (part 2, see config.jelly for part1) for validating the configured values for fields.
          * This method will try to create an issue using the configured fields and delete it afterwards.
@@ -570,17 +587,34 @@ public class JiraTestDataPublisher extends TestDataPublisher {
         public FormValidation validateFieldConfigs(String jsonForm) throws FormException, InterruptedException {
             // extracting the configurations for associated with this plugin (we receive the entire form)
             StaplerRequest req = Stapler.getCurrentRequest();
-            JSONObject jsonObject = JSONObject.fromObject(jsonForm);
-            JSONObject publishers = jsonObject.getJSONObject("publisher");
             JSONObject jiraPublisherJSON = null;
-
-            for(Object o : publishers.keySet()) {
-                if(o.toString().contains(JiraTestDataPublisher.class.getSimpleName())) {
-                    jiraPublisherJSON = (JSONObject) publishers.get(o);
-                    break;
+            JSONObject jsonObject = JSONObject.fromObject(jsonForm);
+            JSONObject prototype = jsonObject.getJSONObject("prototype");
+            Object publishers = prototype.get("testDataPublishers");
+            if (publishers instanceof JSONArray) {
+                JSONArray publishersArray = (JSONArray) publishers;
+                for (Object p : publishersArray) {
+                    JSONObject publisher = (JSONObject) p;
+                    if (!publisher.containsKey("stapler-class")) {
+                        continue;
+                    }
+                    if (StringUtils.equals(JiraTestDataPublisher.class.getCanonicalName(), (String) publisher.get("stapler-class"))){
+                        jiraPublisherJSON = publisher;
+                        break;
+                    }
+                }
+                        
+            } else if (publishers instanceof JSONObject) {
+                JSONObject publisher = (JSONObject) publishers;
+                if (StringUtils.equals(JiraTestDataPublisher.class.getCanonicalName(), (String) publisher.get("stapler-class"))){
+                    jiraPublisherJSON = publisher;
                 }
             }
-
+            
+            if (jiraPublisherJSON == null) {
+                throw new FormException("Unable to retrieve information about JiraTestDataPublisher", null);
+            }
+            
             // constructing the objects from json
             List<AbstractFields> configs = newInstancesFromHeteroList(req, jiraPublisherJSON.get("configs"), getListDescriptors());
             if(configs == null) {
@@ -610,7 +644,7 @@ public class JiraTestDataPublisher extends TestDataPublisher {
 
             //if the issue was created successfully, try to delete it
             try {
-                restClientExtension.deteleIssue(newCreatedIssue.getKey()).claim();
+                restClientExtension.deleteIssue(newCreatedIssue.getKey()).claim();
             } catch (RestClientException e) {
                 JiraUtils.logError("Error when deleting issue", e);
                 return FormValidation.warning(JiraUtils.getErrorMessage(e, "\n"));
