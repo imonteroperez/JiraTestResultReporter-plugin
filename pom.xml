@@ -12,7 +12,7 @@
 
   <properties>
     <revision>2.0.10</revision>
-    <changelist>SNAPSHOT</changelist>
+    <changelist>-SNAPSHOT</changelist>
     <jenkins.version>2.138.4</jenkins.version>
     <jira-rest-client.version>5.2.1</jira-rest-client.version>
     <fugue.version>3.0.0</fugue.version>
@@ -68,9 +68,9 @@
   </developers>
 
   <scm>
-    <connection>scm:git:ssh://github.com/jenkinsci/JiraTestResultReporter-plugin.git</connection>
-    <developerConnection>scm:git:ssh://git@github.com/jenkinsci/JiraTestResultReporter-plugin.git</developerConnection>
-    <url>https://github.com/jenkinsci/JiraTestResultReporter-plugin</url>
+    <connection>scm:git:ssh://github.com/imonteroperez/JiraTestResultReporter-plugin.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/imonteroperez/JiraTestResultReporter-plugin.git</developerConnection>
+    <url>https://github.com/imonteroperez/JiraTestResultReporter-plugin</url>
     <tag>${scmTag}</tag>
   </scm>
 
